@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 import requests
 import streamlit as st
@@ -11,6 +12,7 @@ st.title("Projet Waterflow - Panel de Test")
 
 X_TEST_PATH = "data/processed/X_test.csv"
 Y_TEST_PATH = "data/processed/y_test.csv"
+MEAN_FEATURES_PATH = "mean_features.json"
 
 API_BASE_URL = "http://127.0.0.1:8000"
 URL_PREDICT = f"{API_BASE_URL}/predict"
@@ -34,7 +36,15 @@ def load_real_test_data():
     return combined_df
 
 
+def load_mean_features():
+    if os.path.exists(MEAN_FEATURES_PATH):
+        with open(MEAN_FEATURES_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
 df_test = load_real_test_data()
+mean_features = load_mean_features()
 
 if "current_features" not in st.session_state:
     st.session_state.current_features = [0.0] * 9
@@ -50,8 +60,6 @@ if uploaded_file is not None:
     if st.button("Analyser le document via l'OCR", use_container_width=True):
         try:
             with st.spinner("Analyse du document en cours par l'API..."):
-                # Préparation du fichier multipart pour Requests
-                # uploaded_file.getvalue() lit les octets du fichier chargé
                 files = {
                     "file": (
                         uploaded_file.name,
@@ -59,9 +67,7 @@ if uploaded_file is not None:
                         uploaded_file.type,
                     )
                 }
-                headers = {
-                    "X-API-Key": "votre_cle_client"
-                }  # Clé requise par le blueprint
+                headers = {"X-API-Key": "votre_cle_client"}
 
                 response = requests.post(URL_OCR, headers=headers, files=files)
 
@@ -69,8 +75,6 @@ if uploaded_file is not None:
                 ocr_result = response.json()
                 features_ocr = ocr_result["measurement"]["features"]
 
-                # Extraction ordonnée des 9 features attendues par les inputs numériques
-                # Les valeurs manquantes (null) du JSON sont converties en 0.0 par défaut
                 st.session_state.current_features = [
                     float(features_ocr.get("ph") or 0.0),
                     float(features_ocr.get("hardness") or 0.0),
@@ -83,7 +87,6 @@ if uploaded_file is not None:
                     float(features_ocr.get("turbidity") or 0.0),
                 ]
 
-                # Gestion des alertes s'il manque des données sur la fiche
                 if response.status_code == 206:
                     st.warning(
                         "Document lu partiellement ! Certains champs requis n'ont pas été trouvés sur la fiche."
@@ -139,78 +142,103 @@ st.divider()
 
 st.subheader("Valeurs des caractéristiques (scalées)")
 
+if mean_features is not None:
+    if st.button("Imputer les valeurs manquantes.", use_container_width=True):
+        ordered_keys = [
+            "ph", "hardness", "solids", "chloramines", "sulfate",
+            "conductivity", "organic_carbon", "trihalomethanes", "turbidity"
+        ]
+        
+        new_features = []
+        imputed_count = 0
+        for idx, key in enumerate(ordered_keys):
+            current_val = st.session_state.current_features[idx]
+            if current_val == 0.0:
+                new_features.append(float(mean_features.get(key, 0.0)))
+                imputed_count += 1
+            else:
+                new_features.append(current_val)
+        
+        st.session_state.current_features = new_features
+        if imputed_count > 0:
+            st.toast(f"{imputed_count} caractéristique(s) imputée(s) avec succès !")
+        else:
+            st.toast("Aucune valeur à 0.0 n'a eu besoin d'être imputée.")
+else:
+    st.error("Fichier 'mean_features.json' introuvable. Impossible d'utiliser le bouton d'imputation.")
+
 cf = st.session_state.current_features
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    ph = st.number_input("ph", value=float(cf[0]), format="%.6f")
-    hardness = st.number_input("Hardness", value=float(cf[1]), format="%.6f")
-    solids = st.number_input("Solids", value=float(cf[2]), format="%.6f")
+    ph = st.number_input("ph", value=float(cf[0]))
+    hardness = st.number_input("Hardness", value=float(cf[1]))
+    solids = st.number_input("Solids", value=float(cf[2]))
 
 with col2:
     chloramines = st.number_input(
-        "Chloramines", value=float(cf[3]), format="%.6f"
+        "Chloramines", value=float(cf[3])
     )
-    sulfate = st.number_input("Sulfate", value=float(cf[4]), format="%.6f")
+    sulfate = st.number_input("Sulfate", value=float(cf[4]))
     conductivity = st.number_input(
-        "Conductivity", value=float(cf[5]), format="%.6f"
+        "Conductivity", value=float(cf[5])
     )
 
 with col3:
     organic_carbon = st.number_input(
-        "Organic_carbon", value=float(cf[6]), format="%.6f"
+        "Organic_carbon", value=float(cf[6])
     )
     trihalomethanes = st.number_input(
-        "Trihalomethanes", value=float(cf[7]), format="%.6f"
+        "Trihalomethanes", value=float(cf[7])
     )
-    turbidity = st.number_input("Turbidity", value=float(cf[8]), format="%.6f")
+    turbidity = st.number_input("Turbidity", value=float(cf[8]))
 
 st.divider()
 
-# ─── PRÉDICTION FINAL ───
+# ─── PRÉDICTION FINALE ───
 if st.button(
     "Lancer la prédiction API", type="primary", use_container_width=True
 ):
+    features_list = [
+        ph, hardness, solids, chloramines, sulfate,
+        conductivity, organic_carbon, trihalomethanes, turbidity
+    ]
 
-    payload = {
-        "features": [
-            ph,
-            hardness,
-            solids,
-            chloramines,
-            sulfate,
-            conductivity,
-            organic_carbon,
-            trihalomethanes,
-            turbidity,
-        ]
-    }
-
-    try:
-        with st.spinner("Requête en cours vers l'API Flask..."):
-            response = requests.post(URL_PREDICT, json=payload)
-
-        if response.status_code == 200:
-            result = response.json()
-            status = result["water_status"]
-            prediction = result["prediction"]
-
-            prob = result.get("probability_potable", 0.0)
-            threshold = result.get("decision_threshold_used", 0.5)
-
-            if prediction == 1:
-                st.success(f"Résultat de l'API : {status}")
-            else:
-                st.error(f"Résultat de l'API : {status}")
-
-            st.info(
-                f"Probabilité calculée : {prob:.4f} (Seuil de décision appliqué : {threshold:.2f})"
-            )
-            st.caption(f"Modèle : {result['model_version_used']}")
-        else:
-            st.error(f"Erreur API : {response.text}")
-
-    except requests.exceptions.ConnectionError:
+    if any(val == 0.0 for val in features_list):
         st.error(
-            "Erreur de connexion. L'API Flask ne répond pas sur le port 8000."
+            "Impossible de lancer la prédiction : au moins une des caractéristiques est à 0.0.  \n"
+            "Veuillez remplir toutes les cases ou utiliser le bouton d'imputation ci-dessus."
         )
+    else:
+        payload = {
+            "features": features_list
+        }
+
+        try:
+            with st.spinner("Requête en cours vers l'API Flask..."):
+                response = requests.post(URL_PREDICT, json=payload)
+
+            if response.status_code == 200:
+                result = response.json()
+                status = result["water_status"]
+                prediction = result["prediction"]
+
+                prob = result.get("probability_potable", 0.0)
+                threshold = result.get("decision_threshold_used", 0.5)
+
+                if prediction == 1:
+                    st.success(f"Résultat de l'API : {status}")
+                else:
+                    st.error(f"Résultat de l'API : {status}")
+
+                st.info(
+                    f"Probabilité calculée : {prob:.4f} (Seuil de décision appliqué : {threshold:.2f})"
+                )
+                st.caption(f"Modèle : {result['model_version_used']}")
+            else:
+                st.error(f"Erreur API : {response.text}")
+
+        except requests.exceptions.ConnectionError:
+            st.error(
+                "Erreur de connexion. L'API Flask ne répond pas sur le port 8000."
+            )
