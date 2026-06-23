@@ -1,1 +1,3 @@
 mlflow
+bcrypt
+sqlite3
