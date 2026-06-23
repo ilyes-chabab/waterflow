@@ -106,6 +106,19 @@ mlflow ui
 
 l'interface sera disponible par défaut à l'adresse : http://127.0.0.1:5000
 
+
+Pour lancer le projet d'abord lancer MLFLOW avec :
+python -m mlflow server --host 127.0.0.1 --port 5000
+
+ensuite l'api avec : python3 app.py
+
+
+test api :
+curl -X POST http://localhost:8000/api/ocr/lab-report -H "X-API-Key: votre_cle_client" -F "file=@test_OCR.png"
+
+lancer Streamlit :
+python -m streamlit run ui.py
+
 ## Conclusion
 
 MLflow est aujourd’hui une référence dans le domaine du MLOps grâce à ses capacités de suivi des expériences, de gestion des modèles et d’automatisation des workflows de Machine Learning. Son intégration avec de nombreux outils et frameworks en fait une solution flexible et adaptée aux projets de Data Science modernes.
