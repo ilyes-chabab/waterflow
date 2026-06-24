@@ -5,6 +5,7 @@ Modules : Prédiction (existant) + OCR (nouveau)
 
 import mlflow.xgboost
 import numpy as np
+import hashlib
 from flask import Flask, jsonify, request
 from data.db.WaterFlowDB import WaterFlowDB
 
@@ -53,7 +54,7 @@ def login():
         all_users = db.get_users()
         db.close()
 
-        matched_user = next((u for u in all_users if u[0] == user_id and u[2] == api_key), None)
+        matched_user = next((u for u in all_users if u[0] == user_id and u[2] == hashlib.sha256(api_key.encode()).hexdigest()), None)
 
         if matched_user:
             return jsonify({

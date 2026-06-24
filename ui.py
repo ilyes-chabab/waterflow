@@ -55,6 +55,7 @@ if not st.session_state.logged_in:
                     st.error("L'API Flask ne répond pas sur le port 8000. Lancez app.py d'abord.")
     st.stop()
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # ACCÈS AUTORISÉ : LE PANEL DE TEST COMMENCE ICI
 # ──────────────────────────────────────────────────────────────────────────────
@@ -62,13 +63,22 @@ if not st.session_state.logged_in:
 with st.sidebar:
     st.write(f"👤 **Utilisateur :** {st.session_state.username}")
     st.write(f"🆔 **ID Client :** {st.session_state.user_id}")
-    if st.button("Se déconnecter", type="secondary"):
+    
+    if st.button("📊 Historique des prédictions", use_container_width=True):
+        st.session_state.page = "history"
+        st.rerun()
+    
+    if st.button("Se déconnecter", type="secondary", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.user_id = None
         st.session_state.username = None
         st.session_state.api_key = None
+        st.session_state.page = "main"
         st.rerun()
 
+if "page" not in st.session_state:
+    st.session_state.page = "main"
+    
 st.title("Projet Waterflow - Panel de Test")
 st.caption(f"Session active pour le laboratoire : {st.session_state.username}")
 
@@ -78,6 +88,67 @@ MEAN_FEATURES_PATH = "mean_features.json"
 
 
 @st.cache_data
+def show_history_page():
+    st.title("📊 Historique des prédictions")
+    if st.button("← Retour"):
+        st.session_state.page = "main"
+        st.rerun()
+
+    # GET sur ton endpoint Flask /api/predictions/history (à créer côté app.py)
+    resp = requests.get(
+        f"{API_BASE_URL}/api/predictions/history",
+        params={"user_id": st.session_state.user_id}
+    )
+    if resp.status_code != 200:
+        st.error("Impossible de charger l'historique.")
+        return
+
+    predictions = resp.json()["predictions"]
+
+    for pred in predictions:
+        proba = pred["probability_potable"]
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.progress(proba, text=f"#{pred['id']} — {pred['created_at']} — Proba potable : {proba:.2f}")
+        with col2:
+            if st.button("Détails", key=f"pred_{pred['id']}"):
+                st.session_state.page = "dashboard"
+                st.session_state.selected_prediction_id = pred["id"]
+                st.rerun()
+
+def show_dashboard_page():
+    st.title("📈 Tableau de bord du modèle")
+    if st.button("← Retour à l'historique"):
+        st.session_state.page = "history"
+        st.rerun()
+
+    pred_id = st.session_state.selected_prediction_id
+    # détail de la prédiction sélectionnée
+    pred_detail = requests.get(f"{API_BASE_URL}/api/predictions/{pred_id}").json()
+    st.subheader(f"Prédiction #{pred_id}")
+    st.json(pred_detail)
+
+    st.divider()
+    st.subheader("Performance globale du modèle en production")
+
+    metrics = requests.get(f"{API_BASE_URL}/api/model/metrics").json()
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Accuracy", f"{metrics['accuracy']:.2%}")
+    c2.metric("Recall", f"{metrics['recall']:.2%}")
+    c3.metric("F1-score", f"{metrics['f1_score']:.2%}")
+    c4.metric("ROC AUC", f"{metrics['roc_auc']:.2%}")
+
+if st.session_state.page == "history":
+    show_history_page()
+    st.stop()
+elif st.session_state.page == "dashboard":
+    show_dashboard_page()
+    st.stop()
+    
+    # Graphiques MLflow
+    roc_img = requests.get(f"{API_BASE_URL}/api/model/artifact/roc_curve.png")
+    st.image(roc_img.content, caption="Courbe ROC")
+
 def load_real_test_data():
     if not os.path.exists(X_TEST_PATH) or not os.path.exists(Y_TEST_PATH):
         st.error(

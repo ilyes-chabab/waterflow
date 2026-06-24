@@ -1,4 +1,5 @@
 import sqlite3
+import hashlib
 
 class WaterFlowDB:
     def __init__(self, db_name="data\\db\\waterflow.db"):
@@ -15,8 +16,8 @@ class WaterFlowDB:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             username TEXT,
-            api_key TEXT,
-            right TEXT
+            hashed_api_key TEXT,
+            role INTEGER
         )
         """)
 
@@ -56,19 +57,20 @@ class WaterFlowDB:
 
     # users
 
-    def add_user(self, username, api_key, right):
+    def add_user(self, username, hashed_api_key, role):
+        hashed_api_key = hashlib.sha256(hashed_api_key.encode()).hexdigest()
         self.cursor.execute("""
-        INSERT INTO users (username, api_key, right)
+        INSERT INTO users (username, hashed_api_key, role)
         VALUES (?, ?, ?)
-        """, (username, api_key, right))
+        """, (username, hashed_api_key, role))
         self.conn.commit()
 
-    def update_user(self, user_id, username, api_key, right):
+    def update_user(self, user_id, username, hashed_api_key, role):
         self.cursor.execute("""
         UPDATE users
-        SET username = ?, api_key = ?, right = ?
+        SET username = ?, hashed_api_key = ?, role = ?
         WHERE id = ?
-        """, (username, api_key, right, user_id))
+        """, (username, hashed_api_key, role, user_id))
         self.conn.commit()
 
     def delete_user(self, user_id):
@@ -76,6 +78,7 @@ class WaterFlowDB:
         DELETE FROM users
         WHERE id = ?
         """, (user_id,))
+        self.cursor.execute("""drop table if exists users""")
         self.conn.commit()
 
     def get_users(self):
@@ -160,3 +163,6 @@ class WaterFlowDB:
 
     def close(self):
         self.conn.close()
+
+test = WaterFlowDB()
+print(test.get_users())
