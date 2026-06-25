@@ -1,3 +1,9 @@
 mlflow
 bcrypt
-sqlite3
+streamlit
+requests
+flask
+numpy
+xgboost
+scikit-learn
+imbalanced-learn
