@@ -119,6 +119,19 @@ curl -X POST http://localhost:8000/api/ocr/lab-report -H "X-API-Key: votre_cle_c
 lancer Streamlit :
 python -m streamlit run ui.py
 
+voila pour tester des api :
+test prediction :
+curl -X POST http://127.0.0.1:8000/api/measurements -H "X-API-Key: 12345" -H "Content-Type: application/json" -d "{\"features\": [7.2, 200.5, 15000, 8.1, 320, 450, 15.2, 65.4, 3.5]}"
+
+Test historique :
+curl -X GET http://127.0.0.1:8000/api/measurements -H "X-API-Key: 12345"
+
+test rgpd:
+curl -X GET http://127.0.0.1:8000/api/me -H "X-API-Key: 12345"
+
+test ocr:
+>curl -X POST http://127.0.0.1:8000/api/ocr/lab-report -H "X-API-Key: 12345" -F "file=@test_OCR.png"
+
 ## Conclusion
 
 MLflow est aujourd’hui une référence dans le domaine du MLOps grâce à ses capacités de suivi des expériences, de gestion des modèles et d’automatisation des workflows de Machine Learning. Son intégration avec de nombreux outils et frameworks en fait une solution flexible et adaptée aux projets de Data Science modernes.

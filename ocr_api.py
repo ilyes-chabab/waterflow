@@ -1,13 +1,15 @@
 """
-ocr_api.py – Blueprint Flask pour l'ingestion OCR (Waterflow 2)
+ocr_api.py - Blueprint Flask pour l'ingestion OCR (Waterflow 2)
 Route principale : POST /api/ocr/lab-report
-Utilise OCR.space pour extraire les données d'une fiche labo (image ou PDF).
+Utilise OCR.space pour extraire les donnees d'une fiche labo (image ou PDF).
 """
 
 import os
 import re
 import requests
-from flask import Blueprint, jsonify, request
+import functools
+from flask import Blueprint, jsonify, request, g 
+from data.db.WaterFlowDB import WaterFlowDB
 
 # ──────────────────────────────────────────────
 # Blueprint
@@ -26,6 +28,35 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf", "bmp", "tiff"}
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
+
+def require_api_key(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        api_key = request.headers.get("X-API-Key")
+        if not api_key:
+            return jsonify({"error": "Cle API manquante (header X-API-Key requis)."}), 401
+        
+        try:
+            db = WaterFlowDB()
+            all_users = db.get_users()
+            db.close()
+            
+            # On cherche l'utilisateur propriétaire de la clé
+            matched_user = next((u for u in all_users if u[2] == api_key), None)
+            
+            if not matched_user:
+                return jsonify({"error": "Cle API invalide"}), 401
+            
+            g.current_user = {
+                "id": matched_user[0],
+                "username": matched_user[1]
+            }
+            
+        except Exception as e:
+            return jsonify({"error": f"Erreur d'authentification : {str(e)}"}), 500
+            
+        return f(*args, **kwargs)
+    return decorated
 
 def allowed_file(filename: str) -> bool:
     """Vérifie que l'extension du fichier est autorisée."""
@@ -186,6 +217,7 @@ def count_missing_features(features: dict) -> list[str]:
 # ──────────────────────────────────────────────
 
 @ocr_bp.route("/lab-report", methods=["POST"])
+@require_api_key
 def lab_report():
     """
     POST /api/ocr/lab-report
@@ -201,19 +233,11 @@ def lab_report():
     """
 
     # ── 1. Authentification par clé API ──────────────────
-    api_key = request.headers.get("X-API-Key")
-    if not api_key:
-        return jsonify({"error": "Clé API manquante (header X-API-Key requis)."}), 401
-
-    # TODO : valider api_key contre la base de données clients
-    # client = db.get_client_by_api_key(api_key)
-    # if not client:
-    #     return jsonify({"error": "Clé API invalide ou expirée."}), 403
+    client_id_authentifie = g.current_user["id"] # L'ID sûr issu de la clé API
 
     # ── 2. Validation du fichier ──────────────────────────
     if "file" not in request.files:
-        return jsonify({"error": "Aucun fichier fourni (champ 'file' attendu)."}), 400
-
+        return jsonify({"error": "Aucun fichier fourni."}), 400
     file = request.files["file"]
 
     if file.filename == "":
@@ -264,34 +288,85 @@ def lab_report():
 
     parsed = parse_lab_report(raw_text)
 
-    # Surcharge client_id si passé en form-data
-    client_id_override = request.form.get("client_id") or None
 
     # ── 5. Construction du prélèvement structuré ──────────
-    measurement = build_measurement_payload(parsed, client_id_override)
+    measurement = build_measurement_payload(parsed, client_id_authentifie)
 
     # ── 6. Vérification des features manquantes ───────────
     missing = count_missing_features(measurement["features"])
+    prediction_result = None
+    status = "Indetermine (Donnees manquantes)"
+    prob_potable = None
+
+    # On ne peut prédire que si les 9 fonctionnalités sont présentes
+    if not missing:
+        try:
+            # On récupère les variables globales depuis l'application Flask principale
+            from flask import current_app
+            import numpy as np
+            
+            # On extrait la liste ordonnée des 9 features requises par votre modèle
+            features_list = [
+                measurement["features"]["ph"],
+                measurement["features"]["hardness"],
+                measurement["features"]["solids"],
+                measurement["features"]["chloramines"],
+                measurement["features"]["sulfate"],
+                measurement["features"]["conductivity"],
+                measurement["features"]["organic_carbon"],
+                measurement["features"]["trihalomethanes"],
+                measurement["features"]["turbidity"]
+            ]
+            
+            # Import dynamique pour éviter les imports circulaires
+            from app import model, BEST_THRESHOLD
+            
+            if model is not None:
+                features_array = np.array(features_list).reshape(1, -1)
+                probabilities = model.predict_proba(features_array)
+                prob_potable = float(probabilities[0][1])
+                prediction_result = 1 if prob_potable >= BEST_THRESHOLD else 0
+                status = "Potable (Safe)" if prediction_result == 1 else "Non Potable (Unsafe)"
+                
+                # Sauvegarde directe dans votre table 'prediction' SQLite
+                db = WaterFlowDB()
+                db.add_prediction(
+                    user_id=client_id_authentifie,
+                    ph=features_list[0],
+                    hardness=features_list[1],
+                    solids=features_list[2],
+                    chloramines=features_list[3],
+                    sulfate=features_list[4],
+                    conductivity=features_list[5],
+                    organic_carbon=features_list[6],
+                    trihalomethanes=features_list[7],
+                    turbidity=features_list[8],
+                    potability=prediction_result
+                )
+                db.close()
+            else:
+                status = "Erreur : Modèle ML indisponible sur le serveur"
+        except Exception as e:
+            status = f"Erreur lors de la prediction/sauvegarde : {str(e)}"
+
     warnings = []
     if missing:
         warnings.append(
-            f"Champs non extraits par l'OCR ({len(missing)}/9) : {', '.join(missing)}. "
-            "Vérifiez la qualité du document ou complétez manuellement."
+            f"L'IA n a pas pu emettre de prediction car {len(missing)}/9 champs sont absents : {', '.join(missing)}."
         )
 
-    # ── 7. Réponse ────────────────────────────────────────
     response_body = {
-        "status": "ok" if not missing else "partial",
-        "measurement": measurement,
-        "ocr_raw_text": raw_text,   # utile pour debug ; retirez en production si données sensibles
-        "warnings": warnings,
+        "status": "success" if not missing else "partial_match",
+        "client_id": client_id_authentifie,
+        "prediction": prediction_result,
+        "probability_potable": prob_potable,
+        "water_status": status,
+        "measurement_payload": measurement, 
+        "missing_features": missing,
+        "warnings": warnings
     }
 
-    # TODO : persister `measurement` en base de données ici
-    # measurement_id = db.insert_measurement(measurement)
-    # response_body["measurement_id"] = measurement_id
-
-    return jsonify(response_body), 200 if not missing else 206
+    return jsonify(response_body), 200 if not missing else 202
 
 
 # ──────────────────────────────────────────────
@@ -305,5 +380,5 @@ def ocr_health():
     return jsonify({
         "ocr_service": "ocr.space",
         "api_key_configured": key_present,
-        "warning": None if key_present else "Clé de démo 'helloworld' active — limites : 1 page, 1 Mo, 25 000 req/mois.",
+        "warning": None if key_present else "Cle de demo 'helloworld' active — limites : 1 page, 1 Mo, 25 000 req/mois.",
     }), 200

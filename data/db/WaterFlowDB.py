@@ -121,6 +121,10 @@ class WaterFlowDB:
         self.cursor.execute("SELECT * FROM prediction")
         return self.cursor.fetchall()
     
+    def get_predictions_by_user(self, user_id):
+        self.cursor.execute("SELECT * FROM prediction WHERE user_id = ?", (user_id,))
+        return self.cursor.fetchall()
+    
     # métrics
 
     def add_metrics(self, prediction_id, accuracy, precision, recall, f1_score,
