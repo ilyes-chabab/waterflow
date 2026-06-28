@@ -110,7 +110,11 @@ l'interface sera disponible par défaut à l'adresse : http://127.0.0.1:5000
 Pour lancer le projet d'abord lancer MLFLOW avec :
 python -m mlflow server --host 127.0.0.1 --port 5000
 
-ensuite l'api avec : python3 app.py
+ensuite l'api avec : 
+
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+(flask) python3 app.py
 
 
 test api :
@@ -135,6 +139,15 @@ curl -X POST http://127.0.0.1:8000/api/ocr/lab-report -H "X-API-Key: 12345" -F "
 test Creation Client
 curl -X POST http://127.0.0.1:8000/api/clients -H "X-API-Key: 33e38d21a0287a959ceb64a7fadc9cf1786a41c3234ef12cc0d0267c35ea3ef7" -H "Content-Type: application/json" -d "{\"username\": \"Laboratoire_Sud\", \"role\": \"Client\"}"
 
+test rotate key :
+curl -X POST "http://localhost:8000/api/clients/1/rotate-key" -H "accept: application/json" -H "X-API-Key: TA_CLE_API_ADMIN_ICI"
+
+test suppression :
+curl -X DELETE "http://localhost:8000/api/me" -H "accept: application/json" -H "X-API-Key: TA_CLE_API_ICI"
+
 ## Conclusion
 
 MLflow est aujourd’hui une référence dans le domaine du MLOps grâce à ses capacités de suivi des expériences, de gestion des modèles et d’automatisation des workflows de Machine Learning. Son intégration avec de nombreux outils et frameworks en fait une solution flexible et adaptée aux projets de Data Science modernes.
+
+client test 1 :
+5412ef7e105e243e2e56dd2b49a3bd0579b0675f968a7516e673057167e79e87

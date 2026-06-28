@@ -109,7 +109,7 @@ if uploaded_file is not None:
 
         except requests.exceptions.ConnectionError:
             st.error(
-                "Impossible de joindre l'API Flask. Vérifiez qu'elle tourne sur le port 8000."
+                "Impossible de joindre l'API . Vérifiez qu'elle tourne sur le port 8000."
             )
 
 st.caption("Ou utilisez les échantillons du jeu de test :")
@@ -222,7 +222,7 @@ if st.button(
         }
 
         try:
-            with st.spinner("Requête en cours vers l'API Flask..."):
+            with st.spinner("Requête en cours vers l'API ..."):
                 response = requests.post(URL_PREDICT, json=payload, headers=headers)
 
             if response.status_code in [200, 201]:
@@ -246,5 +246,5 @@ if st.button(
 
         except requests.exceptions.ConnectionError:
             st.error(
-                "Erreur de connexion. L'API Flask ne répond pas sur le port 8000."
+                "Erreur de connexion. L'API ne répond pas sur le port 8000."
             )
