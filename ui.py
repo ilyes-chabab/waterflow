@@ -7,7 +7,7 @@ if "logged_in" not in st.session_state:
     st.session_state.user_id = None
     st.session_state.username = None
     st.session_state.api_key = None
-    st.session_state.role = None  # Stocke "Admin" ou "Client"
+    st.session_state.role = None  # Stocke "Admin" , "Data_Quality" ou "Client"
 
 API_BASE_URL = "http://127.0.0.1:8000"
 URL_LOGIN = f"{API_BASE_URL}/api/login"
@@ -18,6 +18,7 @@ page_connexion = st.Page(lambda: login_screen(), title="Connexion", icon=None)
 page_panel = st.Page("views/panel_test.py", title="Panel de Test", icon=None)
 page_historique = st.Page("views/historique.py", title="Historique des Analyses", icon=None)
 page_admin = st.Page("views/accueil_admin.py", title="Accueil Admin", icon=None)
+page_dashboard_qualite = st.Page("dashboard_qualite.py", title="Dashboard Qualite", icon=None)
 
 # Définition du routage dynamique selon le rôle
 if not st.session_state.logged_in:
@@ -26,6 +27,8 @@ if not st.session_state.logged_in:
 else:
     if st.session_state.role == "Admin":
         nav = st.navigation([page_admin])
+    elif st.session_state.role == "Quality_Analyst":
+        nav = st.navigation([page_dashboard_qualite])
     else:
         # Par défaut, rôle "Client" ou autre
         nav = st.navigation([page_panel, page_historique])
