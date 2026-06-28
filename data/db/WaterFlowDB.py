@@ -17,7 +17,8 @@ class WaterFlowDB:
             id INTEGER PRIMARY KEY,
             username TEXT,
             api_key TEXT,
-            right TEXT
+            right TEXT,
+            is_active INTEGER DEFAULT 1                        
         )
         """)
 
@@ -56,6 +57,20 @@ class WaterFlowDB:
         )
         """)
 
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            endpoint TEXT,
+            method TEXT,
+            status INTEGER,
+            duration REAL,
+            ip TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """)
+
         self.conn.commit()
 
     def _ensure_prediction_columns(self):
@@ -72,7 +87,11 @@ class WaterFlowDB:
             self.cursor.execute(
                 "ALTER TABLE prediction ADD COLUMN created_at TEXT"
             )
-        self.conn.commit()
+        self.cursor.execute("PRAGMA table_info(users)")
+        existing_user_cols = [row[1] for row in self.cursor.fetchall()]
+        if "is_active" not in existing_user_cols:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+            self.conn.commit()
 
     # users
 
@@ -92,16 +111,45 @@ class WaterFlowDB:
         self.conn.commit()
 
     def delete_user(self, user_id):
+        # 1. Supprimer les métriques liées aux prédictions de cet utilisateur
+        self.cursor.execute("""
+        DELETE FROM performance_metrics 
+        WHERE prediction_id IN (SELECT id FROM prediction WHERE user_id = ?)
+        """, (user_id,))
+
+        # 2. Supprimer toutes les prédictions de cet utilisateur
+        self.cursor.execute("""
+        DELETE FROM prediction
+        WHERE user_id = ?
+        """, (user_id,))
+
+        # 3. Option RGPD pour les logs d'audit : anonymiser plutôt que supprimer
+        # Cela permet de conserver l'historique de l'audit sans bloquer la suppression
+        self.cursor.execute("""
+        UPDATE audit_logs
+        SET user_id = NULL
+        WHERE user_id = ?
+        """, (user_id,))
+
+        # 4. Supprimer enfin l'utilisateur
         self.cursor.execute("""
         DELETE FROM users
         WHERE id = ?
         """, (user_id,))
+        
         self.conn.commit()
 
     def get_users(self):
         self.cursor.execute("SELECT * FROM users")
         return self.cursor.fetchall()
     
+    def rotate_user_key(self, user_id: int, new_hashed_key: str):
+        self.cursor.execute("""
+        UPDATE users
+        SET api_key = ?, is_active = 1
+        WHERE id = ?
+        """, (new_hashed_key, user_id))
+        self.conn.commit()
     # prédiction
 
     def add_prediction(self, user_id, ph, hardness, solids, chloramines,
@@ -226,6 +274,23 @@ class WaterFlowDB:
 
     def get_metrics(self):
         self.cursor.execute("SELECT * FROM performance_metrics")
+        return self.cursor.fetchall()
+    
+    # Log
+
+    def add_audit_log(self, user_id: int | None, endpoint: str, method: str, status: int, duration: float, ip: str):
+        self.cursor.execute("""
+        INSERT INTO audit_logs (user_id, endpoint, method, status, duration, ip)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, endpoint, method, status, duration, ip))
+        self.conn.commit()
+
+    def get_audit_logs(self):
+        self.cursor.execute("""
+        SELECT id, user_id, endpoint, method, status, duration, ip, created_at 
+        FROM audit_logs 
+        ORDER BY id DESC
+        """)
         return self.cursor.fetchall()
 
     def close(self):

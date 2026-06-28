@@ -91,7 +91,7 @@ def load_and_display_history():
             st.error(f"Impossible de charger l'historique ({response.status_code}) : {response.text}")
 
     except requests.exceptions.ConnectionError:
-        st.error("Erreur de connexion. L'API Flask ne répond pas sur le port 8000. Lancez app.py d'abord.")
+        st.error("Erreur de connexion. L'API ne répond pas sur le port 8000. Lancez app.py d'abord.")
 
 if st.button("Rafraîchir l'historique", type="secondary"):
     st.rerun()

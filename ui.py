@@ -17,7 +17,8 @@ URL_LOGIN = f"{API_BASE_URL}/api/login"
 page_connexion = st.Page(lambda: login_screen(), title="Connexion", icon=None)
 page_panel = st.Page("views/panel_test.py", title="Panel de Test", icon=None)
 page_historique = st.Page("views/historique.py", title="Historique des Analyses", icon=None)
-page_admin = st.Page("views/accueil_admin.py", title="Accueil Admin", icon=None)
+page_admin = st.Page("views/accueil_admin.py", title="Registre des comptes", icon=None)
+page_securite = st.Page("views/securite_admin.py", title="Gestion des cles et Securite", icon=None)
 page_dashboard_qualite = st.Page("dashboard_qualite.py", title="Dashboard Qualite", icon=None)
 
 # Définition du routage dynamique selon le rôle
@@ -26,7 +27,7 @@ if not st.session_state.logged_in:
     nav = st.navigation([page_connexion])
 else:
     if st.session_state.role == "Admin":
-        nav = st.navigation([page_admin])
+        nav = st.navigation([page_admin, page_securite])
     elif st.session_state.role == "Quality_Analyst":
         nav = st.navigation([page_dashboard_qualite])
     else:
