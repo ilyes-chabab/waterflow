@@ -35,14 +35,18 @@ def require_api_key(f):
         api_key = request.headers.get("X-API-Key")
         if not api_key:
             return jsonify({"error": "Cle API manquante (header X-API-Key requis)."}), 401
-        
+
+        import hashlib
+        hashed_api_key = hashlib.sha256(api_key.encode()).hexdigest()
+
         try:
             db = WaterFlowDB()
             all_users = db.get_users()
             db.close()
             
-            # On cherche l'utilisateur propriétaire de la clé
-            matched_user = next((u for u in all_users if u[2] == api_key), None)
+            # On cherche l'utilisateur propriétaire de la clé (comparaison sur le hash,
+            # cohérent avec app.py : on ne stocke/compare jamais la clé en clair)
+            matched_user = next((u for u in all_users if u[2] == hashed_api_key), None)
             
             if not matched_user:
                 return jsonify({"error": "Cle API invalide"}), 401
