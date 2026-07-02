@@ -138,6 +138,7 @@ def client(test_db, monkeypatch):
     from api.main import app
 
     with TestClient(app) as c:
+        c.app.state.model = DummyModel()
         yield c
 
 
