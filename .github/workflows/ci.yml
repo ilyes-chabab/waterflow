@@ -26,7 +26,7 @@ jobs:
         run: python scripts/validate_data.py
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest
 
       - name: Train & validate model (F1-score gate)
         run: python scripts/validate_model.py
