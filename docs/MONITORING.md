@@ -34,7 +34,7 @@ l'utilisateur.
 
 Ces métriques renseignent sur la santé de l'**API**, pas directement sur la qualité des
 **prédictions** du modèle (accuracy/F1/etc.) — celles-ci sont visibles séparément dans l'onglet
-"Métriques du modèle" du Dashboard Qualité (`dashboard_qualite.py`), issues de MLflow.
+"Métriques du modèle" du Dashboard Qualité (`scripts/dashboard_qualite.py`), issues de MLflow.
 
 ## Installation et configuration
 

@@ -84,7 +84,7 @@ chargé en interne.
 ## Incident 3 — écriture des tests d'intégration UI (`tests/test_ui_integration.py`)
 
 **Contexte** : `tests/test_pipeline.py` ne teste que l'API FastAPI en direct (via `TestClient`),
-jamais la couche Streamlit qui la consomme (`ui.py`, `views/*.py`, `dashboard_qualite.py`). Un
+jamais la couche Streamlit qui la consomme (`ui.py`, `views/*.py`, `scripts/dashboard_qualite.py`). Un
 nouveau fixture `ui_client` (`tests/conftest.py`) redirige `requests.get/post/delete` vers ce même
 `TestClient`, pour exécuter les pages Streamlit via `streamlit.testing.v1.AppTest` en intégration
 réelle contre l'API (mêmes routes, même DB de test, même modèle factice).

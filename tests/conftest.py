@@ -155,7 +155,7 @@ def _url_to_path(url: str) -> str:
 @pytest.fixture
 def ui_client(client, monkeypatch):
     """Redirige requests.get/post/delete vers le TestClient FastAPI, pour que les
-    pages Streamlit (views/*.py, dashboard_qualite.py) soient testées en intégration
+    pages Streamlit (views/*.py, scripts/dashboard_qualite.py) soient testées en intégration
     réelle contre l'API (mêmes routes, même DB de test, même modèle factice) sans
     avoir besoin d'un serveur HTTP réellement lancé sur le port 8000."""
 

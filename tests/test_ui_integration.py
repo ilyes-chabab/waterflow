@@ -2,7 +2,7 @@
 test_ui_integration.py - Tests d'intégration UI <-> API (Waterflow 2).
 
 Utilise streamlit.testing.v1.AppTest pour exécuter réellement les pages Streamlit
-(views/*.py, dashboard_qualite.py) et le fixture `ui_client` (tests/conftest.py) qui
+(views/*.py, scripts/dashboard_qualite.py) et le fixture `ui_client` (tests/conftest.py) qui
 redirige requests.get/post/delete vers le vrai TestClient FastAPI : ces tests exercent
 donc les vraies routes API (auth, DB de test, modèle factice), pas des réponses mockées
 à la main. Complète tests/test_pipeline.py, qui ne teste que l'API en direct, jamais
@@ -186,8 +186,8 @@ def test_ui_mes_donnees_delete_with_confirmation(ui_client, test_db):
 
 
 def test_ui_dashboard_qualite_shows_real_data(ui_client, test_db):
-    """dashboard_qualite.py : les 3 onglets appellent réellement les routes /api/dashboard/*."""
-    at = AppTest.from_file("dashboard_qualite.py")
+    """scripts/dashboard_qualite.py : les 3 onglets appellent réellement les routes /api/dashboard/*."""
+    at = AppTest.from_file("scripts/dashboard_qualite.py")
     at.session_state["username"] = "analyst_test"
     at.session_state["role"] = "Quality_Analyst"
     at.session_state["api_key"] = test_db["analyst_key"]

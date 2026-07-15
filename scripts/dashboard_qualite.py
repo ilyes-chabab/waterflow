@@ -45,7 +45,7 @@ with tab_releves:
 
     try:
         response = requests.get(
-            f"{API_BASE_URL}/api/dashboard/measurements",
+            f"../{API_BASE_URL}/api/dashboard/measurements",
             headers=headers, params=params
         )
         if response.status_code == 200:
@@ -85,7 +85,7 @@ with tab_releves:
 with tab_metriques:
     st.subheader("Modele en Production")
     try:
-        response = requests.get(f"{API_BASE_URL}/api/dashboard/metrics", headers=headers)
+        response = requests.get(f"../{API_BASE_URL}/api/dashboard/metrics", headers=headers)
         if response.status_code == 200:
             data = response.json()
             st.write(f"**Version :** {data['version']}  |  **Run ID :** `{data['run_id']}`")
@@ -115,7 +115,7 @@ with tab_metriques:
 with tab_versions:
     st.subheader("Toutes les versions enregistrees")
     try:
-        response = requests.get(f"{API_BASE_URL}/api/dashboard/model-versions", headers=headers)
+        response = requests.get(f"../{API_BASE_URL}/api/dashboard/model-versions", headers=headers)
         if response.status_code == 200:
             versions_data = response.json()["versions"]
 
@@ -153,7 +153,7 @@ with tab_versions:
                 if st.button("Rejouer la prediction"):
                     try:
                         replay_resp = requests.post(
-                            f"{API_BASE_URL}/api/dashboard/replay",
+                            f"../{API_BASE_URL}/api/dashboard/replay",
                             headers=headers,
                             json={"run_id": run_id_choisi, "features": valeurs}
                         )

@@ -1,7 +1,7 @@
 # Parcours utilisateurs - Waterflow 2
 
 Schémas fonctionnels dérivés de la logique de routage dans `ui.py` (`st.navigation` selon
-`st.session_state.role`) et des actions déclenchées dans `views/*.py` / `dashboard_qualite.py`.
+`st.session_state.role`) et des actions déclenchées dans `views/*.py` / `scripts/dashboard_qualite.py`.
 
 Pour visualiser : coller un bloc dans [mermaid.live](https://mermaid.live), ou utiliser
 l'extension "Markdown Preview Mermaid Support" dans VS Code pour prévisualiser ce fichier
@@ -38,7 +38,7 @@ flowchart TD
     Choice -->|Saisie manuelle| Manual[Remplir les 9 champs numériques] --> Fields
 
     Fields --> Impute{Des valeurs restent à 0.0 ?}
-    Impute -->|Oui - bouton Imputer| ImputeCall[Complète via mean_features.json] --> Fields
+    Impute -->|Oui - bouton Imputer| ImputeCall[Complète via data/processed/mean_features.json] --> Fields
     Impute -->|Non| Predict[Bouton : Lancer la prédiction API]
 
     Predict --> PredictCall[POST /api/measurements]
@@ -51,7 +51,7 @@ flowchart TD
     Result -.->|navigation via sidebar| Hist
 ```
 
-## 2. Parcours Quality_Analyst (`dashboard_qualite.py`, 3 onglets)
+## 2. Parcours Quality_Analyst (`scripts/dashboard_qualite.py`, 3 onglets)
 
 ```mermaid
 flowchart TD

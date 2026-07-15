@@ -46,7 +46,7 @@ for feature, val in mean_values.items():
     print(f"  - {feature}: {val:.6f}")
 
 # Sauvegarde dans le JSON pour l'API
-OUTPUT_JSON = "mean_features.json"
+OUTPUT_JSON = "data/processed/mean_features.json"
 with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
     json.dump(mean_values, f, indent=4)
 

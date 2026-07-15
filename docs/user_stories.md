@@ -1,7 +1,7 @@
 # Spécifications fonctionnelles - User Stories (Waterflow 2)
 
 Rédigées à partir du comportement réel de l'API (`api/main.py`, `api/ocr_router.py`,
-`api/auth.py`) et de l'UI (`ui.py`, `views/*.py`, `dashboard_qualite.py`) — voir
+`api/auth.py`) et de l'UI (`ui.py`, `views/*.py`, `scripts/dashboard_qualite.py`) — voir
 [parcours_utilisateurs.md](parcours_utilisateurs.md) pour les schémas de navigation
 correspondants. Quand un critère de validation est déjà couvert par un test automatisé, le
 test est cité pour assurer la traçabilité spec ↔ code.

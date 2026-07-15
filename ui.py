@@ -22,7 +22,7 @@ page_historique = st.Page("views/historique.py", title="Historique des Analyses"
 page_mes_donnees = st.Page("views/mes_donnees.py", title="Mes Données (RGPD)", icon=None)
 page_admin = st.Page("views/accueil_admin.py", title="Registre des comptes", icon=None)
 page_securite = st.Page("views/securite_admin.py", title="Gestion des cles et Securite", icon=None)
-page_dashboard_qualite = st.Page("dashboard_qualite.py", title="Dashboard Qualite", icon=None)
+page_dashboard_qualite = st.Page("scripts/dashboard_qualite.py", title="Dashboard Qualite", icon=None)
 
 # Définition du routage dynamique selon le rôle
 if not st.session_state.logged_in:

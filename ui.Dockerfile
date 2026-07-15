@@ -6,9 +6,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ui.py .
-COPY dashboard_qualite.py .
+COPY scripts/dashboard_qualite.py .
 COPY views/ ./views/
-COPY mean_features.json .
+COPY data/processed/mean_features.json .
 COPY data/processed/X_test.csv data/processed/y_test.csv ./data/processed/
 
 EXPOSE 8501
