@@ -1,10 +1,12 @@
+import os
+
 import streamlit as st
 import requests
 
 st.title("Sécurité & Gestion des Accès")
 st.caption("Attention : Les actions effectuées ici modifient instantanément les droits et accès des clients.")
 
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 URL_CLIENTS = f"{API_BASE_URL}/api/clients"
 
 headers = {

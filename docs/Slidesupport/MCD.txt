@@ -1,0 +1,10 @@
+Waterflow 2 - MCD:
+https://www.mocodo.net/
+
+USERS: id, username, api_key, right, is_active
+TRACER, 0N USERS, 01 LOGS_AUDIT
+LOGS_AUDIT: id, endpoint, method, status, duration, ip, created_at
+:
+
+SOUMETTRE, 0N USERS, 11 PRELEVEMENT
+PRELEVEMENT: id, ph, hardness, solids, chloramines, sulfate, conductivity, organic_carbon, trihalomethanes, turbidity, potability, source, created_at

@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -11,7 +13,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.stop()
 
 # ── 2. CONSTANTES & APPEL API ─────────────────────────────────────────
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 URL_HISTORY = f"{API_BASE_URL}/api/measurements"
 
 st.title("Historique de vos Prélèvements & Prédictions")

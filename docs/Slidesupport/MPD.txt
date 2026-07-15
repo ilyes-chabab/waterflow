@@ -1,0 +1,38 @@
+Waterflow 2 - MPD:
+https://dbdiagram.io/d
+
+Table users {
+  id integer [pk, increment]
+  username varchar
+  api_key varchar [note: 'SHA-256 hash, jamais stocké en clair']
+  right varchar [note: 'Client | Quality_Analyst | Admin']
+  is_active integer [default: 1, note: '0 = clé révoquée']
+}
+
+Table prediction {
+  id integer [pk, increment]
+  user_id integer [ref: > users.id]
+  ph real
+  Hardness real
+  Solids real
+  Chloramines real
+  Sulfate real
+  Conductivity real
+  Organic_carbon real
+  Trihalomethanes real
+  Turbidity real
+  Potability boolean
+  source varchar [default: 'manuel', note: 'manuel | ocr']
+  created_at timestamp
+}
+
+Table audit_logs {
+  id integer [pk, increment]
+  user_id integer [ref: > users.id, note: 'NULL après suppression RGPD du compte (droit à l’oubli)']
+  endpoint varchar
+  method varchar
+  status integer
+  duration real
+  ip varchar
+  created_at timestamp
+}

@@ -25,7 +25,7 @@ mlflow.set_experiment(EXPERIMENT_NAME)
 # ──────────────────────────────────────────────
 # Chargement des données
 # ──────────────────────────────────────────────
-with open("data/processed/processed_data.pkl", "rb") as f:
+with open("data\processed\processed_data.pkl", "rb") as f:
     data = pickle.load(f)
 
 X_train = data["X_train"]

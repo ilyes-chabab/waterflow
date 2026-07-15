@@ -1,0 +1,58 @@
+services:
+  mlflow:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: mlflow.Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      # Sans --backend-store-uri explicite, mlflow server stocke tout (registre +
+      # sqlite mlflow.db + artefacts) dans son repertoire de travail (/app), pas
+      # dans un sous-dossier mlruns/ : on monte donc /app en entier pour persister
+      # entre les redemarrages/rebuilds du conteneur.
+      - ./mlflow_data:/app
+
+  api:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mlflow
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./data/db:/app/data/db
+    ports:
+      - "8000:8000"
+
+  streamlit:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ui.Dockerfile
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+
+  prometheus:
+    platform: linux/amd64
+    image: prom/prometheus
+    depends_on:
+      - api
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    platform: linux/amd64
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"

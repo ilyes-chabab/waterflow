@@ -12,14 +12,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
+from prometheus_client import Counter
 
 from data.db.WaterFlowDB import WaterFlowDB
 from .auth import get_current_user, UserInfo  # partagé avec main.py
+from .logging_config import logger
 
 # ──────────────────────────────────────────────
 # Router  (équivalent du Blueprint Flask)
 # ──────────────────────────────────────────────
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
+
+OCR_FAILURES = Counter(
+    "ocr_failures_total", "Total OCR call failures by reason", ["reason"]
+)
 
 OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY", "helloworld")
 OCR_SPACE_URL = "https://api.ocr.space/parse/image"
@@ -155,21 +161,29 @@ async def lab_report(
     try:
         ocr_response = _call_ocr_space(file_bytes, file.filename or "upload")
     except requests.exceptions.Timeout:
+        logger.error("ocr_call_failed", extra={"reason": "timeout", "client_id": current_user.id})
+        OCR_FAILURES.labels(reason="timeout").inc()
         raise HTTPException(status_code=504, detail={
             "error": "Le service OCR n'a pas répondu (timeout 30 s). Réessayez.",
             "incident": "OCR_TIMEOUT",
         })
     except requests.exceptions.ConnectionError:
+        logger.error("ocr_call_failed", extra={"reason": "connection_error", "client_id": current_user.id})
+        OCR_FAILURES.labels(reason="connection_error").inc()
         raise HTTPException(status_code=502, detail={
             "error": "Impossible de joindre OCR.space.",
             "incident": "OCR_UNREACHABLE",
         })
     except requests.exceptions.HTTPError as e:
+        logger.error("ocr_call_failed", extra={"reason": "http_error", "client_id": current_user.id, "error": str(e)})
+        OCR_FAILURES.labels(reason="http_error").inc()
         raise HTTPException(status_code=502, detail={
             "error": f"OCR.space a retourné une erreur HTTP : {e}",
             "incident": "OCR_HTTP_ERROR",
         })
     except ValueError as e:
+        logger.error("ocr_call_failed", extra={"reason": "processing_error", "client_id": current_user.id, "error": str(e)})
+        OCR_FAILURES.labels(reason="processing_error").inc()
         raise HTTPException(status_code=422, detail={
             "error": str(e),
             "incident": "OCR_PROCESSING_ERROR",

@@ -1,7 +1,7 @@
 import pickle
 import json
 
-DATA_PATH = "data\processed\processed_data.pkl"
+DATA_PATH = "data/processed/processed_data.pkl"
 
 with open(DATA_PATH, "rb") as f:
     data = pickle.load(f)

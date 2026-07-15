@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -5,7 +7,7 @@ import pandas as pd
 st.title("Registre des Utilisateurs & Audit")
 st.write("Consultez la liste des comptes actifs et l'historique des actions sur la plateforme.")
 
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 URL_CLIENTS = f"{API_BASE_URL}/api/clients"
 URL_LOGS = f"{API_BASE_URL}/api/audit-logs"
 

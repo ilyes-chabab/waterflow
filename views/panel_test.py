@@ -14,7 +14,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 st.title("Projet Waterflow - Panel de Test")
 st.caption(f"Session active pour le laboratoire : {st.session_state.username}")
 
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 URL_PREDICT = f"{API_BASE_URL}/api/measurements"
 URL_OCR = f"{API_BASE_URL}/api/ocr/lab-report"
 

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate raw data (schema / missing values)
+        run: python scripts/validate_data.py
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Train & validate model (F1-score gate)
+        run: python scripts/validate_model.py
+
+      - name: Build API Docker image (packaging)
+        run: docker build -t waterflow2-api:${{ github.sha }} .
+
+      - name: Build full docker-compose stack (mlflow + api + streamlit)
+        run: docker compose build
