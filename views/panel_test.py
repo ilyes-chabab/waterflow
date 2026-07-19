@@ -20,7 +20,7 @@ URL_OCR = f"{API_BASE_URL}/api/ocr/lab-report"
 
 X_TEST_PATH = "data/processed/X_test.csv"
 Y_TEST_PATH = "data/processed/y_test.csv"
-MEAN_FEATURES_PATH = "data/processed/mean_features.json"
+MEAN_FEATURES_PATH = "../data/processed/mean_features.json"
 
 
 @st.cache_data
@@ -174,7 +174,7 @@ if mean_features is not None:
         else:
             st.toast("Aucune valeur à 0.0 n'a eu besoin d'être imputée.")
 else:
-    st.error("Fichier 'data/processed/mean_features.json' introuvable. Impossible d'utiliser le bouton d'imputation.")
+    st.error("Fichier '../data/processed/mean_features.json' introuvable. Impossible d'utiliser le bouton d'imputation.")
 
 cf = st.session_state.current_features
 

@@ -1,6 +1,9 @@
 import hashlib
 import os
 import sqlite3
+from datetime import datetime, timedelta
+
+API_KEY_VALIDITY_DAYS = 90
 
 class WaterFlowDB:
     def __init__(self, db_name=None):
@@ -81,14 +84,24 @@ class WaterFlowDB:
         if "is_active" not in existing_user_cols:
             self.cursor.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
             self.conn.commit()
+        if "expires_at" not in existing_user_cols:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN expires_at TEXT")
+            # Comptes existants : on leur accorde une nouvelle fenêtre de validité
+            # pleine plutôt que de les expirer immédiatement lors de la migration.
+            default_expiry = (datetime.utcnow() + timedelta(days=API_KEY_VALIDITY_DAYS)).isoformat()
+            self.cursor.execute(
+                "UPDATE users SET expires_at = ? WHERE expires_at IS NULL", (default_expiry,)
+            )
+            self.conn.commit()
 
     # users
 
     def add_user(self, username, api_key, right):
+        expires_at = (datetime.utcnow() + timedelta(days=API_KEY_VALIDITY_DAYS)).isoformat()
         self.cursor.execute("""
-        INSERT INTO users (username, api_key, right)
-        VALUES (?, ?, ?)
-        """, (username, api_key, right))
+        INSERT INTO users (username, api_key, right, expires_at)
+        VALUES (?, ?, ?, ?)
+        """, (username, api_key, right, expires_at))
         self.conn.commit()
 
     def update_user(self, user_id, username, api_key, right):
@@ -127,12 +140,26 @@ class WaterFlowDB:
         return self.cursor.fetchall()
     
     def rotate_user_key(self, user_id: int, new_hashed_key: str):
+        expires_at = (datetime.utcnow() + timedelta(days=API_KEY_VALIDITY_DAYS)).isoformat()
         self.cursor.execute("""
         UPDATE users
-        SET api_key = ?, is_active = 1
+        SET api_key = ?, is_active = 1, expires_at = ?
         WHERE id = ?
-        """, (new_hashed_key, user_id))
+        """, (new_hashed_key, expires_at, user_id))
         self.conn.commit()
+
+    def renew_user_key(self, user_id: int):
+        """Renouvellement en libre-service : prolonge la validité de la clé
+        actuelle sans en changer la valeur (contrairement à la rotation, qui
+        est une action d'administration révoquant l'ancienne clé)."""
+        expires_at = (datetime.utcnow() + timedelta(days=API_KEY_VALIDITY_DAYS)).isoformat()
+        self.cursor.execute("""
+        UPDATE users
+        SET expires_at = ?
+        WHERE id = ?
+        """, (expires_at, user_id))
+        self.conn.commit()
+        return expires_at
     # prédiction
 
     def add_prediction(self, user_id, ph, hardness, solids, chloramines,

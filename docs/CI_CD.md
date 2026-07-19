@@ -8,7 +8,7 @@ livraison).
 
 ## Outil retenu
 
-**GitHub Actions**, choisi car le dépôt est déjà hébergé sur GitHub (`github.com/Sonicario49/waterflow2`)
+**GitHub Actions**, choisi car le dépôt est déjà hébergé sur GitHub (`github.com/ilyes-chabab/waterflow`)
 — pas de compte ou d'infrastructure CI supplémentaire à gérer, intégration native aux pull
 requests, et gratuit pour un dépôt de cette taille.
 
@@ -26,26 +26,41 @@ la fusion dans `main`.
 
 ## Étapes de la chaîne
 
+Le fichier définit deux jobs : `ci` (validation) et `delivery` (livraison), ce dernier ne se
+déclenchant qu'après succès du premier (`needs: ci`) et uniquement sur push vers `main`.
+
+### Job `ci`
+
 | # | Étape | Ce qu'elle fait | Concerne |
 |---|---|---|---|
 | 1 | `Checkout` | Récupère le code du commit déclencheur | C18 |
 | 2 | `Set up Python` | Installe Python 3.10, active le cache pip (`requirements.txt`) | C18 |
 | 3 | `Install dependencies` | `pip install -r requirements.txt` | C18 |
 | 4 | `Validate raw data` | `python scripts/validate_data.py` — vérifie le schéma et l'absence de dérive sur `data/raw/water_potability.csv` | C13 |
-| 5 | `Run tests` | `python -m pytest` — 47 tests (API + intégration UI) | C18 |
+| 5 | `Run tests (with coverage)` | `python -m pytest --cov --cov-report=term-missing --cov-report=xml` — suite complète (API + intégration UI), avec mesure de couverture | C18 |
 | 6 | `Train & validate model` | `python scripts/validate_model.py` — réentraîne (SMOTE + XGBoost) et vérifie le F1-score contre un seuil minimal (gate qualité) | C13 |
 | 7 | `Build API Docker image` | `docker build -t waterflow2-api:<sha> .` — packaging de l'API seule | C19 |
 | 8 | `Build full docker-compose stack` | `docker compose build` — packaging des 3 images (mlflow, api, streamlit) | C19 |
 
+### Job `delivery` (déclenché uniquement sur push vers `main`, après succès du job `ci`)
+
+| # | Étape | Ce qu'elle fait | Concerne |
+|---|---|---|---|
+| 1 | `Log in to GHCR` | Authentification à `ghcr.io` avec le `GITHUB_TOKEN` fourni automatiquement (aucun secret à configurer) | C19 |
+| 2 | `Build and push API image` | Construit et **publie** `ghcr.io/<repo>-api:<sha>` et `:latest` | C19 |
+| 3 | `Build and push Streamlit UI image` | Construit et **publie** `ghcr.io/<repo>-ui:<sha>` et `:latest` | C19 |
+
 Chaque étape est bloquante : si l'une échoue, les suivantes ne s'exécutent pas (comportement par
 défaut de GitHub Actions), et le commit est marqué en échec sur GitHub.
 
-## Ce qui n'est pas automatisé (volontairement laissé ouvert)
+## Livraison automatisée
 
-L'étape de **livraison** proprement dite (publication de l'image sur un registre, déploiement)
-n'est pas intégrée à la chaîne : la mise en production reste une pull request revue et mergée
-manuellement (7+ PR mergées ainsi sur ce projet, voir l'historique GitHub). Ce n'est donc pas une
-étape automatisée de `ci.yml`, juste une pratique d'équipe.
+Contrairement à la version précédente de cette chaîne, l'étape de **livraison** (publication de
+l'image sur un registre) est désormais automatisée par le job `delivery` : sur chaque push vers
+`main` ayant passé la validation, les images `api` et `ui` sont reconstruites et publiées sur
+GitHub Container Registry, taguées par le SHA du commit et `latest`. La mise en production reste
+néanmoins déclenchée par une pull request revue et mergée manuellement — c'est le packaging et la
+publication de l'image qui sont automatisés, pas le déploiement final sur un environnement cible.
 
 ## Installation / reproduction en local
 
@@ -70,7 +85,7 @@ manuellement (7+ PR mergées ainsi sur ce projet, voir l'historique GitHub). Ce 
 ## Historique d'exécution
 
 Chaque push/PR sur ce projet a déclenché un run visible dans l'onglet **Actions** du dépôt
-(`github.com/Sonicario49/waterflow2/actions`). Les runs récents sont verts de bout en bout,
+(`github.com/ilyes-chabab/waterflow/actions`). Les runs récents sont verts de bout en bout,
 y compris les 2 étapes de build Docker.
 
 ## Limite connue

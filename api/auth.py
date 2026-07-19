@@ -5,6 +5,7 @@ Utilisée dans main.py ET ocr_router.py via Depends(get_current_user).
 
 import hashlib
 from dataclasses import dataclass
+from datetime import datetime
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -19,6 +20,7 @@ class UserInfo:
     id: int
     username: str
     role: str
+    expires_at: str | None = None
 
 
 def get_current_user(api_key: str | None = Security(api_key_header)) -> UserInfo:
@@ -58,7 +60,14 @@ def get_current_user(api_key: str | None = Security(api_key_header)) -> UserInfo
             detail="Cette clé API a été révoquée.",
         )
 
-    return UserInfo(id=matched[0], username=matched[1], role=matched[3])
+    expires_at = matched[5] if len(matched) > 5 else None
+    if expires_at and datetime.fromisoformat(expires_at) < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Cette clé API a expiré. Merci de la renouveler via /api/renew-key.",
+        )
+
+    return UserInfo(id=matched[0], username=matched[1], role=matched[3], expires_at=expires_at)
 
 
 def require_role(*allowed_roles: str):

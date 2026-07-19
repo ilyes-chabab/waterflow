@@ -44,10 +44,20 @@ services:
     image: prom/prometheus
     depends_on:
       - api
+      - alertmanager
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
+
+  alertmanager:
+    platform: linux/amd64
+    image: prom/alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
 
   grafana:
     platform: linux/amd64

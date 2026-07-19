@@ -24,8 +24,17 @@ mlflow.set_experiment(EXPERIMENT_NAME)
 
 # ──────────────────────────────────────────────
 # Chargement des données
+#
+# processed_data.pkl est produit par scripts/prepare_data.py : le split
+# train / val / test est fait AVANT toute imputation, écrêtage des outliers ou
+# normalisation, pour que ces statistiques de prétraitement ne soient jamais calculées
+# avec des lignes de validation/test (fuite de données corrigée - voir prepare_data.py).
+# X_train/y_train ne contiennent QUE le train ; X_val/y_val servent au choix du seuil.
+# X_test/y_test existent aussi dans le pickle mais ne sont volontairement pas chargés
+# ici : le test ne doit être évalué qu'une seule fois, dans scripts/model_selection.py,
+# jamais réutilisé pour ajuster un seuil ou un hyperparamètre.
 # ──────────────────────────────────────────────
-with open("data\processed\processed_data.pkl", "rb") as f:
+with open("data/processed/processed_data.pkl", "rb") as f:
     data = pickle.load(f)
 
 X_train = data["X_train"]
@@ -45,18 +54,24 @@ print(f"Après SMOTE      — 0: {(y_train_resampled==0).sum()} | 1: {(y_train_r
 
 # ──────────────────────────────────────────────
 # Paramètres XGBoost optimisés
+#
+# Issus de scripts/model_selection.py : recherche par validation croisée
+# (StratifiedKFold 5 plis, RandomizedSearchCV, SMOTE appliqué à l'intérieur de chaque
+# pli pour éviter toute fuite entre plis) sur les 9 features brutes. RandomForest et une
+# régression logistique ont aussi été comparés dans les mêmes conditions ; l'écart avec
+# XGBoost est resté dans le bruit de la validation croisée (± 0.02-0.03 de F1), ce qui ne
+# justifiait pas de changer de famille de modèle pour un gain non significatif.
 # ──────────────────────────────────────────────
 params_xgb = {
-    "n_estimators":     300,
+    "n_estimators":     150,
     "max_depth":        5,
-    "learning_rate":    0.05,
-    "subsample":        0.8,
-    "colsample_bytree": 0.8,
+    "learning_rate":    0.08,
+    "subsample":        0.7,
+    "colsample_bytree": 0.6,
     "min_child_weight": 3,
-    "gamma":            0.2,
-    "reg_alpha":        0.1,
+    "gamma":            0.1,
+    "reg_alpha":        1,
     "reg_lambda":       1.5,
-    "use_label_encoder": False,
     "eval_metric":      "logloss",
     "random_state":     42,
 }

@@ -1,0 +1,33 @@
+groups:
+  - name: waterflow2_alerts
+    rules:
+      - alert: APIDown
+        expr: up{job="waterflow2"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "L'API Waterflow 2 est injoignable"
+          description: "Prometheus n'a pas pu scraper l'endpoint /metrics de l'API depuis au moins 30s."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taux d'erreurs 5xx élevé sur l'API"
+          description: "Plus de 5% des requêtes des 5 dernières minutes se terminent en erreur serveur (5xx)."
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latence P95 anormalement élevée"
+          description: "95% des requêtes mettent plus d'1 seconde à répondre sur les 5 dernières minutes."

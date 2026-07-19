@@ -187,7 +187,11 @@ def test_ui_mes_donnees_delete_with_confirmation(ui_client, test_db):
 
 def test_ui_dashboard_qualite_shows_real_data(ui_client, test_db):
     """scripts/dashboard_qualite.py : les 3 onglets appellent réellement les routes /api/dashboard/*."""
-    at = AppTest.from_file("scripts/dashboard_qualite.py")
+    # default_timeout augmenté (3s -> 15s) : cette page enchaine 3 vrais aller-retours
+    # HTTP via TestClient (un par onglet) ; sous charge cumulée d'une suite complete,
+    # le timeout par defaut de Streamlit AppTest peut etre trop juste et faire
+    # remonter de faux echecs (`at.error`) sans rapport avec la logique applicative.
+    at = AppTest.from_file("scripts/dashboard_qualite.py", default_timeout=15)
     at.session_state["username"] = "analyst_test"
     at.session_state["role"] = "Quality_Analyst"
     at.session_state["api_key"] = test_db["analyst_key"]

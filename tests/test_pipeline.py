@@ -140,6 +140,36 @@ def test_login_invalid_key(client):
     assert response.status_code == 401
 
 
+def test_expired_key_rejected(client, test_db):
+    """Test fonctionnel : une clé API dont expires_at est passé est refusée (401)."""
+    from data.db.WaterFlowDB import WaterFlowDB
+
+    db = WaterFlowDB(test_db["db_path"])
+    db.cursor.execute(
+        "UPDATE users SET expires_at = '2000-01-01T00:00:00' WHERE username = 'client_test'"
+    )
+    db.conn.commit()
+    db.close()
+
+    response = client.post("/api/login", headers={"X-API-Key": test_db["client_key"]})
+    assert response.status_code == 401
+    assert "expir" in response.json()["detail"].lower()
+
+
+def test_renew_key_extends_validity(client, test_db):
+    """Test fonctionnel : /api/renew-key prolonge expires_at sans changer la clé."""
+    headers = {"X-API-Key": test_db["client_key"]}
+
+    response = client.post("/api/renew-key", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["expires_at"] is not None
+
+    # La clé (inchangée) reste valide après renouvellement.
+    login = client.post("/api/login", headers=headers)
+    assert login.status_code == 200
+    assert login.json()["days_remaining"] >= 89
+
+
 def test_login_rate_limited(client, test_db):
     """Test fonctionnel : /api/login coupe court au bout de 10 tentatives/minute (anti brute-force)."""
     headers = {"X-API-Key": test_db["client_key"]}
@@ -373,15 +403,58 @@ def test_ocr_health(client):
 
 
 def test_model_non_regression_f1_score():
-    """Test de non-régression : s'assure que le F1-score ne rechute pas en dessous du minimum acceptable.
-
-    Ce test simule la validation de performance minimale requise avant le déploiement.
+    """Test de non-régression : réentraîne le modèle (SMOTE + XGBoost) sur les
+    données de validation et s'assure que le F1-score réellement calculé ne
+    rechute pas en dessous du minimum acceptable.
     """
-    F1_SCORE_MINIMAL = 0.50
+    from scripts.validate_model import MIN_F1_SCORE, train_and_evaluate
 
-    current_model_f1_score = 0.5868
+    metrics = train_and_evaluate()
 
-    assert current_model_f1_score >= F1_SCORE_MINIMAL, (
-        f"Régression détectée ! Le F1-score actuel ({current_model_f1_score}) "
-        f"est inférieur au seuil de non-régression fixé à {F1_SCORE_MINIMAL}"
+    assert metrics["f1_score"] >= MIN_F1_SCORE, (
+        f"Régression détectée ! Le F1-score actuel ({metrics['f1_score']:.4f}) "
+        f"est inférieur au seuil de non-régression fixé à {MIN_F1_SCORE}"
     )
+
+
+def test_processed_data_has_no_leakage():
+    """Garde-fou de non-régression sur la fuite de données corrigée dans
+    scripts/prepare_data.py : train, val et test doivent rester trois ensembles
+    disjoints, et le seul journal des mesures brutes (data/raw/water_potability.csv)
+    doit s'y retrouver intégralement repartis sans doublon ni perte de ligne.
+
+    Avant la correction, l'imputation/l'écrêtage des outliers/la standardisation
+    étaient calculés sur l'ensemble du dataset avant le split (fuite), et
+    `X_test.csv` était en réalité une copie de `X_val.csv` (aucun jeu de test
+    réellement tenu à l'écart). Ce test empêche ces deux régressions de revenir
+    silencieusement.
+    """
+    import pickle
+
+    import pandas as pd
+
+    from scripts.validate_model import PROCESSED_DATA_PATH
+
+    with open(PROCESSED_DATA_PATH, "rb") as f:
+        data = pickle.load(f)
+
+    X_train, X_val, X_test = data["X_train"], data["X_val"], data["X_test"]
+    y_train, y_val, y_test = data["y_train"], data["y_val"], data["y_test"]
+
+    # Chaque ligne (features + label) doit être unique à un seul des trois ensembles.
+    def row_signatures(X, y):
+        combined = X.copy()
+        combined["__label__"] = y.values
+        return set(map(tuple, combined.round(6).itertuples(index=False, name=None)))
+
+    train_sig = row_signatures(X_train, y_train)
+    val_sig = row_signatures(X_val, y_val)
+    test_sig = row_signatures(X_test, y_test)
+
+    assert train_sig.isdisjoint(val_sig), "Des lignes du train se retrouvent aussi dans le val (fuite)."
+    assert train_sig.isdisjoint(test_sig), "Des lignes du train se retrouvent aussi dans le test (fuite)."
+    assert val_sig.isdisjoint(test_sig), "X_test n'est pas un jeu distinct de X_val (régression du bug historique)."
+
+    raw = pd.read_csv("data/raw/water_potability.csv")
+    total = len(X_train) + len(X_val) + len(X_test)
+    assert total == len(raw), "Le split train/val/test ne couvre pas exactement le dataset brut."

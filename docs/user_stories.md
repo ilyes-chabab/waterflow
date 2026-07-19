@@ -24,10 +24,17 @@ espace personnel sans créer de mot de passe.
 
 **Contexte** : l'authentification est stateless, basée sur le header `X-API-Key` (SHA-256
 haché puis comparé en base). Il n'y a pas d'inscription libre : la clé est fournie par un Admin.
-L'authentification repose sur des clés API statiques, sans expiration ; il n'y a donc pas de
-mécanisme de renouvellement de jeton (pas de JWT/OAuth2 ni de refresh token) — la révocation ou
-la rotation d'une clé est un acte administratif explicite (`POST /api/clients/{cid}/rotate-key`),
-jamais un renouvellement automatique déclenché côté client.
+Chaque clé API a une durée de validité de 90 jours (`expires_at`, contrôlée à chaque requête
+authentifiée dans `get_current_user`). Deux mécanismes de renouvellement existent, avec des
+responsabilités distinctes :
+- **Renouvellement en libre-service** (`POST /api/renew-key`) : l'utilisateur courant prolonge
+  la validité de sa propre clé de 90 jours supplémentaires, **sans en changer la valeur**. L'UI
+  affiche un avertissement et un bouton "Renouveler ma clé API" dans la barre latérale dès qu'il
+  reste 14 jours ou moins avant expiration.
+- **Rotation administrative** (`POST /api/clients/{cid}/rotate-key`) : acte réservé à l'Admin,
+  qui révoque l'ancienne clé et en émet une nouvelle (ex. en cas de compromission).
+
+Une clé expirée renvoie `401` avec un message invitant explicitement à la renouveler.
 
 **Scénario d'utilisation**
 1. L'utilisateur ouvre l'application Streamlit ; seule la page de connexion est visible
@@ -42,7 +49,12 @@ jamais un renouvellement automatique déclenché côté client.
 - Une clé absente renvoie `401` ("Clé API manquante").
 - Une clé invalide ou inconnue renvoie `401` ("Clé API invalide ou expirée").
 - Une clé révoquée (`is_active = 0`) renvoie `403`.
-- Couvert par `tests/test_pipeline.py::test_login_valid_key` et `test_login_invalid_key`.
+- Une clé expirée renvoie `401` ("Cette clé API a expiré. Merci de la renouveler via /api/renew-key.").
+- Le renouvellement en libre-service (`POST /api/renew-key`) prolonge `expires_at` de 90 jours
+  sans changer la valeur de la clé ; l'ancienne clé reste donc valide après renouvellement
+  (contrairement à la rotation admin, qui la révoque).
+- Couvert par `tests/test_pipeline.py::test_login_valid_key`, `test_login_invalid_key`,
+  `test_expired_key_rejected` et `test_renew_key_extends_validity`.
 - **Accessibilité (WCAG 2.1.1 Clavier)** : le champ de saisie de la clé et le bouton "Se
   connecter" doivent être atteignables et activables au clavier seul (Tab puis Entrée),
   sans piège de focus.

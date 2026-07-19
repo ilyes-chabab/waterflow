@@ -1,0 +1,11 @@
+route:
+  receiver: default
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+
+receivers:
+  - name: default
+    # En local/dev : les alertes sont visibles dans l'UI Alertmanager (http://localhost:9093).
+    # En production, remplacer par un receveur email/webhook (ex: webhook_configs vers Slack/Teams).

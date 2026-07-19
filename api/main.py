@@ -12,6 +12,7 @@ import numpy as np
 import mlflow.xgboost
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from mlflow.tracking import MlflowClient
 from typing import Annotated
 
@@ -243,11 +244,35 @@ def health(request: Request):
 @limiter.limit("10/minute")
 def login(request: Request, current_user: Annotated[UserInfo, Depends(get_current_user)]):
     """Verifie la cle API et retourne les infos de l'utilisateur."""
+    days_remaining = None
+    if current_user.expires_at:
+        delta = datetime.fromisoformat(current_user.expires_at) - datetime.utcnow()
+        days_remaining = max(delta.days, 0)
+
     return {
         "authenticated": True,
         "user_id": current_user.id,
         "username": current_user.username,
         "role": current_user.role,
+        "expires_at": current_user.expires_at,
+        "days_remaining": days_remaining,
+    }
+
+
+@app.post("/api/renew-key", tags=["Auth"],
+          summary="Renouveler la validite de sa propre cle API (sans en changer la valeur)")
+def renew_key(current_user: Annotated[UserInfo, Depends(get_current_user)]):
+    """Renouvellement en libre-service : prolonge la fenetre de validite de la
+    cle API de l'utilisateur courant de 90 jours. Contrairement a la rotation
+    (reservee a l'Admin), la valeur de la cle ne change pas."""
+    db = WaterFlowDB()
+    new_expiry = db.renew_user_key(current_user.id)
+    db.close()
+
+    return {
+        "message": "Cle API renouvelee avec succès.",
+        "user_id": current_user.id,
+        "expires_at": new_expiry,
     }
 
 

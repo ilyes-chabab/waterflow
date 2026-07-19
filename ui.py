@@ -10,9 +10,11 @@ if "logged_in" not in st.session_state:
     st.session_state.username = None
     st.session_state.api_key = None
     st.session_state.role = None  # Stocke "Admin" , "Data_Quality" ou "Client"
+    st.session_state.days_remaining = None
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 URL_LOGIN = f"{API_BASE_URL}/api/login"
+URL_RENEW_KEY = f"{API_BASE_URL}/api/renew-key"
 
 # ── 1. GESTION DES PAGES VIA ST.NAVIGATION ───────────────────────────
 
@@ -63,10 +65,11 @@ def login_screen():
                         st.session_state.user_id = res_data["user_id"]
                         st.session_state.username = res_data["username"]
                         st.session_state.api_key = api_key_input
-                        
+
                         # ATTENTION : On recupere la valeur du champ "role" ou "right" renvoye par l'API
-                        st.session_state.role = res_data.get("role") 
-                        
+                        st.session_state.role = res_data.get("role")
+                        st.session_state.days_remaining = res_data.get("days_remaining")
+
                         st.success("Connexion reussie.")
                         st.rerun()
                     elif response.status_code == 401:
@@ -84,6 +87,28 @@ if st.session_state.logged_in:
         st.write(f"**Utilisateur :** {st.session_state.username}")
         st.write(f"**Role :** {st.session_state.role}")
         st.write(f"**ID Client :** {st.session_state.user_id}")
+
+        days_remaining = st.session_state.get("days_remaining")
+        if days_remaining is not None:
+            if days_remaining <= 14:
+                st.warning(f"Votre cle API expire dans {days_remaining} jour(s).")
+                if st.button("Renouveler ma cle API", type="primary", use_container_width=True):
+                    try:
+                        renew_res = requests.post(
+                            URL_RENEW_KEY,
+                            headers={"X-API-Key": st.session_state.api_key},
+                        )
+                        if renew_res.status_code == 200:
+                            st.session_state.days_remaining = 90
+                            st.success("Cle API renouvelee pour 90 jours.")
+                            st.rerun()
+                        else:
+                            st.error(f"Erreur de renouvellement ({renew_res.status_code}).")
+                    except requests.exceptions.ConnectionError:
+                        st.error("L'API ne repond pas.")
+            else:
+                st.caption(f"Cle API valide encore {days_remaining} jour(s).")
+
         st.divider()
         if st.button("Se deconnecter", type="secondary", use_container_width=True):
             st.session_state.logged_in = False
@@ -91,6 +116,7 @@ if st.session_state.logged_in:
             st.session_state.username = None
             st.session_state.api_key = None
             st.session_state.role = None
+            st.session_state.days_remaining = None
             st.rerun()
 
 # Affiche la page active sélectionnée dans le menu latéral
