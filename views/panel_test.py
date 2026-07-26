@@ -20,7 +20,7 @@ URL_OCR = f"{API_BASE_URL}/api/ocr/lab-report"
 
 X_TEST_PATH = "data/processed/X_test.csv"
 Y_TEST_PATH = "data/processed/y_test.csv"
-MEAN_FEATURES_PATH = "../data/processed/mean_features.json"
+MEAN_FEATURES_PATH = "data/processed/mean_features.json"
 
 
 @st.cache_data

@@ -440,3 +440,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# CA racine locale (proxy/antivirus faisant de l'inspection TLS, ex. Norton) -
+# specifique a la machine de dev, ne doit jamais etre commitee ni utilisee en CI.
+docker/certs/*.crt
+docker/certs/*.cer
+!docker/certs/.gitkeep
