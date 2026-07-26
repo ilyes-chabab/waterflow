@@ -7,5 +7,9 @@ route:
 
 receivers:
   - name: default
-    # En local/dev : les alertes sont visibles dans l'UI Alertmanager (http://localhost:9093).
-    # En production, remplacer par un receveur email/webhook (ex: webhook_configs vers Slack/Teams).
+    # host.docker.internal : depuis le conteneur alertmanager, joint le serveur
+    # toast_notifier.py qui tourne sur la machine hote (scripts/toast_notifier.py),
+    # port 5001. Necessite que ce script tourne pour recevoir les notifications.
+    webhook_configs:
+      - url: "http://host.docker.internal:5001/webhook"
+        send_resolved: true

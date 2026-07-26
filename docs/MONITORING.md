@@ -86,6 +86,48 @@ mitigations existent néanmoins :
 - Grafana propose nativement des tables de données (pas seulement des graphiques) pour la plupart
   des panels, une alternative plus accessible qu'une courbe pour qui utilise un lecteur d'écran.
 
+## Alerting — Alertmanager
+
+Complète la chaîne : Prometheus évalue en continu des règles d'alerte (`alert_rules.yml`) et
+transmet celles qui se déclenchent à Alertmanager, qui décide comment notifier.
+
+```
+Prometheus (règles, alert_rules.yml)  ── alerte firing ──►  Alertmanager :9093  ── webhook ──►  notification
+```
+
+### Règles définies (`alert_rules.yml`)
+
+| Alerte | Condition | Délai (`for`) | Sévérité |
+|---|---|---|---|
+| `APIDown` | `up{job="waterflow2"} == 0` (Prometheus n'arrive plus à scraper l'API) | 30s | critical |
+| `HighErrorRate` | Plus de 5% des requêtes des 5 dernières minutes en 5xx | 2m | critical |
+| `HighLatency` | P95 du temps de réponse > 1s sur 5 minutes | 2m | warning |
+
+Le `for:` évite le bruit : une alerte doit rester vraie en continu pendant ce délai avant de
+passer de `pending` à `firing` (et d'être transmise à Alertmanager).
+
+### Notification (`alertmanager.yml`)
+
+Le receiver `default` envoie un webhook vers `scripts/toast_notifier.py`, un petit serveur Flask
+qui tourne **sur la machine hôte** (pas dans Docker — un conteneur Linux ne peut pas déclencher de
+notification Windows) et affiche un toast Windows via `winotify` pour chaque alerte, avec un
+second toast à la résolution (`send_resolved: true`).
+
+```bash
+pip install winotify
+python scripts/toast_notifier.py   # écoute sur le port 5001
+```
+
+Alertmanager (dans son conteneur) atteint ce serveur via `http://host.docker.internal:5001/webhook`,
+l'adresse spéciale que Docker Desktop route vers l'hôte.
+
+### Vérifier / tester la chaîne
+
+- Alertes actuellement évaluées par Prometheus : `http://localhost:9090/alerts`
+- Alertes reçues par Alertmanager : `http://localhost:9093` ou `curl http://localhost:9093/api/v2/alerts`
+- Simuler `APIDown` : `docker compose stop api`, attendre ~30-40s (le toast doit apparaître),
+  puis `docker compose start api` (toast de résolution).
+
 ## Limite connue
 
 Sans `--backend-store-uri` explicite, le service `mlflow` stocke son registre dans un fichier
