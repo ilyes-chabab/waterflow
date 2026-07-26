@@ -16,7 +16,7 @@ from datetime import datetime
 from mlflow.tracking import MlflowClient
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, make_asgi_app
 from pydantic import BaseModel, Field
@@ -25,7 +25,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from data.db.WaterFlowDB import WaterFlowDB
-from .auth import UserInfo, get_current_user, require_role
+from .auth import UserInfo, api_key_header, get_current_user, require_role
 from .logging_config import logger
 from .ocr_router import router as ocr_router
 
@@ -240,9 +240,33 @@ def health(request: Request):
 # ──────────────────────────────────────────────
 # Routes – Authentification
 # ──────────────────────────────────────────────
+LOGIN_DELAY_SECONDS = 1.0
+
+
+def _login_guard(api_key: str | None = Security(api_key_header)) -> UserInfo:
+    """Meme verification que get_current_user, mais avec un delai constant
+    d'environ 1 seconde, que la cle soit valide ou non.
+
+    Objectif : ralentir un bruteforce sur /api/login. La limite slowapi
+    (10/3heures) coupe deja court a un script qui enchaine les tentatives,
+    mais un essai qui repond instantanement reste rapide a tester en volume
+    tant que la limite n'est pas atteinte. En forcant chaque tentative -
+    reussie ou non - a couter au moins une seconde, un bruteforce devient
+    inefficace en pratique meme avant de heurter la limite de requetes.
+    """
+    start = time.monotonic()
+    try:
+        return get_current_user(api_key)
+    finally:
+        elapsed = time.monotonic() - start
+        remaining = LOGIN_DELAY_SECONDS - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+
+
 @app.post("/api/login", tags=["Auth"], summary="Verifier sa cle API")
-@limiter.limit("10/minute")
-def login(request: Request, current_user: Annotated[UserInfo, Depends(get_current_user)]):
+@limiter.limit("10/3hours")
+def login(request: Request, current_user: Annotated[UserInfo, Depends(_login_guard)]):
     """Verifie la cle API et retourne les infos de l'utilisateur."""
     days_remaining = None
     if current_user.expires_at:
