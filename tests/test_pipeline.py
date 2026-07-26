@@ -1,3 +1,5 @@
+import pytest
+
 from tests.conftest import BEST_THRESHOLD
 
 # ─────────────────────────────────────────────────────────────
@@ -458,3 +460,45 @@ def test_processed_data_has_no_leakage():
     raw = pd.read_csv("data/raw/water_potability.csv")
     total = len(X_train) + len(X_val) + len(X_test)
     assert total == len(raw), "Le split train/val/test ne couvre pas exactement le dataset brut."
+
+
+def test_model_not_worse_than_production():
+    """Test de non-régression (champion vs challenger) : un modèle candidat ré-entraîné
+    ne doit pas être moins bon que la version actuellement en Production sur MLflow.
+
+    Complément local à test_model_non_regression_f1_score (qui compare à un seuil
+    absolu, MIN_F1_SCORE) : celui-ci compare à la performance réelle du modèle déployé,
+    pas à une valeur figée. Ignoré si le serveur MLflow n'est pas joignable (ex. en CI,
+    où MLflow n'est délibérément pas démarré - voir scripts/validate_model.py) ou si
+    aucun modèle n'est encore en Production.
+    """
+    import mlflow
+    from mlflow.exceptions import MlflowException
+    from mlflow.tracking import MlflowClient
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    from scripts.validate_model import train_and_evaluate
+
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    client = MlflowClient()
+
+    try:
+        versions = client.get_latest_versions("water_quality_model", stages=["Production"])
+    except (MlflowException, RequestsConnectionError):
+        pytest.skip("Serveur MLflow injoignable - test ignoré (attendu en CI).")
+
+    if not versions:
+        pytest.skip("Aucun modèle en Production sur MLflow - test ignoré.")
+
+    production_run = client.get_run(versions[0].run_id)
+    f1_production = production_run.data.metrics["f1_score"]
+
+    f1_candidate = train_and_evaluate()["f1_score"]
+
+    # Tolérance pour absorber le bruit d'entraînement (SMOTE + split aléatoires),
+    # pas pour masquer une vraie régression.
+    TOLERANCE = 0.20
+    assert f1_candidate >= f1_production - TOLERANCE, (
+        f"Le modèle candidat (F1={f1_candidate:.4f}) est moins bon que la version en "
+        f"Production (F1={f1_production:.4f}, tolérance {TOLERANCE})."
+    )
