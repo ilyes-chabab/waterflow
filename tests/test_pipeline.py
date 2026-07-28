@@ -502,3 +502,27 @@ def test_model_not_worse_than_production():
         f"Le modèle candidat (F1={f1_candidate:.4f}) est moins bon que la version en "
         f"Production (F1={f1_production:.4f}, tolérance {TOLERANCE})."
     )
+
+
+def test_concurrent_writes_no_lock_error(client, test_db):
+    """Test de non-régression : rejoue le scénario de charge concurrente de
+    l'incident #001 (docs/incidents/001-database-is-locked.md) - 20 requêtes
+    simultanées sur /api/measurements, chacune déclenchant deux écritures SQLite
+    (prediction + audit_logs). Avant le correctif WAL + busy_timeout + retry,
+    une partie de ces requêtes échouait en 500 (sqlite3.OperationalError:
+    database is locked).
+    """
+    import concurrent.futures
+
+    headers = {"X-API-Key": test_db["client_key"]}
+
+    def submit():
+        return client.post(
+            "/api/measurements", json={"features": POTABLE_FEATURES}, headers=headers
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+        responses = list(pool.map(lambda _: submit(), range(20)))
+
+    statuses = [r.status_code for r in responses]
+    assert all(s == 201 for s in statuses), f"Statuts obtenus : {statuses}"

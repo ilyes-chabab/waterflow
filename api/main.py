@@ -8,6 +8,7 @@ Swagger UI : http://localhost:8000/docs
 import hashlib
 import os
 import secrets
+import sqlite3
 import numpy as np
 import mlflow.xgboost
 import time
@@ -35,6 +36,12 @@ HTTP_REQUESTS = Counter(
 )
 HTTP_LATENCY = Histogram(
     "http_request_duration_seconds", "Request duration", ["endpoint"]
+)
+# Incident #001 (docs/incidents/001-database-is-locked.md) : une erreur de verrou
+# SQLite est toujours anormale (voir alert_rules.yml, DatabaseLocked), d'ou un
+# compteur dedie plutot que de se reposer sur HTTP_REQUESTS{status="500"} seul.
+DB_LOCKED_ERRORS = Counter(
+    "db_locked_errors_total", "Total SQLite lock conflicts by endpoint", ["endpoint"]
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -325,14 +332,27 @@ def add_measurement(
     status_label = "Potable (Safe)" if pred == 1 else "Non Potable (Unsafe)"
 
     db = WaterFlowDB()
-    db.add_prediction(
-        user_id=current_user.id,
-        ph=f[0], hardness=f[1], solids=f[2], chloramines=f[3],
-        sulfate=f[4], conductivity=f[5], organic_carbon=f[6],
-        trihalomethanes=f[7], turbidity=f[8],
-        potability=pred, source="manuel",
-    )
-    db.close()
+    try:
+        db.add_prediction(
+            user_id=current_user.id,
+            ph=f[0], hardness=f[1], solids=f[2], chloramines=f[3],
+            sulfate=f[4], conductivity=f[5], organic_carbon=f[6],
+            trihalomethanes=f[7], turbidity=f[8],
+            potability=pred, source="manuel",
+        )
+    except sqlite3.OperationalError as e:
+        # Journalisation minimisee (RGPD) : endpoint, methode, utilisateur, horodatage -
+        # jamais les valeurs de mesure elles-memes. Voir docs/incidents/001-database-is-locked.md.
+        logger.error("db_write_conflict", extra={
+            "endpoint": request.url.path,
+            "method": request.method,
+            "user_id": current_user.id,
+            "error": str(e),
+        })
+        DB_LOCKED_ERRORS.labels(endpoint=request.url.path).inc()
+        raise HTTPException(status_code=503, detail="Service temporairement indisponible, réessayez.")
+    finally:
+        db.close()
 
     return {
         "client_id": current_user.id,

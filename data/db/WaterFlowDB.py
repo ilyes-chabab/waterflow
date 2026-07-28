@@ -1,6 +1,7 @@
 import hashlib
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta
 
 API_KEY_VALIDITY_DAYS = 90
@@ -9,10 +10,30 @@ class WaterFlowDB:
     def __init__(self, db_name=None):
         if db_name is None:
             db_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), "waterflow.db")
-        self.conn = sqlite3.connect(db_name)
+        # timeout=5.0 : une connexion qui trouve la base verrouillee attend jusqu'a
+        # 5s avant d'echouer, au lieu d'echouer immediatement (sqlite3.connect ne
+        # bloque pas indefiniment par defaut). WAL autorise les lectures concurrentes
+        # pendant une ecriture ; busy_timeout est le pendant cote moteur SQLite du
+        # timeout Python ci-dessus. Voir docs/incidents/001-database-is-locked.md.
+        self.conn = sqlite3.connect(db_name, timeout=5.0)
+        self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("PRAGMA busy_timeout=5000;")
         self.cursor = self.conn.cursor()
         self.enable_foreign_keys()
         self.create_tables()
+
+    def _commit_with_retry(self, max_attempts=3):
+        """Nouvelle tentative bornee sur les ecritures critiques (prediction,
+        audit_logs) : absorbe une contention residuelle qui subsisterait malgre
+        WAL + busy_timeout sous forte concurrence, sans boucler indefiniment."""
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self.conn.commit()
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" not in str(e).lower() or attempt == max_attempts:
+                    raise
+                time.sleep(0.1 * attempt)
 
     def enable_foreign_keys(self):
         self.cursor.execute("PRAGMA foreign_keys = ON")
@@ -179,7 +200,7 @@ class WaterFlowDB:
             trihalomethanes, turbidity, potability, source
         ))
 
-        self.conn.commit()
+        self._commit_with_retry()
         return self.cursor.lastrowid
 
     def update_prediction(self, prediction_id, ph, hardness, potability):
@@ -256,7 +277,7 @@ class WaterFlowDB:
         INSERT INTO audit_logs (user_id, endpoint, method, status, duration, ip)
         VALUES (?, ?, ?, ?, ?, ?)
         """, (user_id, endpoint, method, status, duration, ip))
-        self.conn.commit()
+        self._commit_with_retry()
 
     def get_audit_logs(self):
         self.cursor.execute("""
