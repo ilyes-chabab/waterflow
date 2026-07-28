@@ -114,11 +114,16 @@ ensuite l'api avec :
 
 python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-test api :
-curl -X POST http://localhost:8000/api/ocr/lab-report -H "X-API-Key: <VOTRE_CLE_API>" -F "file=@test_OCR.png"
 
 lancer Streamlit :
 python -m streamlit run ui.py
+
+OU 
+
+docker compose up -d 
+
+test api :
+curl -X POST http://localhost:8000/api/ocr/lab-report -H "X-API-Key: <VOTRE_CLE_API>" -F "file=@test_OCR.png"
 
 voila pour tester des api :
 test prediction :

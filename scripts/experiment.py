@@ -1,3 +1,10 @@
+import sys
+
+# Evite un UnicodeEncodeError sur console Windows (cp1252) quand MLflow affiche
+# l'emoji URL_ du run ("View run ... at: ...") a la fin de mlflow.start_run().
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 import pickle
 import mlflow
 import mlflow.xgboost

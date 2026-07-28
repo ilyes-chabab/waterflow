@@ -48,8 +48,9 @@ def _call_ocr_space(file_bytes: bytes, filename: str) -> dict:
         "language": "fre",
         "isOverlayRequired": False,
         "OCREngine": 2,
-        "scale": True,
-        "isTable": True,
+        "scale": True,  # compense les photos basse resolution prises au telephone
+        "isTable": True,  # la fiche labo est structuree en lignes/colonnes
+        "detectOrientation": True,  # photos terrain prises en portrait ou paysage
     }
     if filename.lower().endswith(".pdf"):
         payload["filetype"] = "PDF"
@@ -58,7 +59,11 @@ def _call_ocr_space(file_bytes: bytes, filename: str) -> dict:
         OCR_SPACE_URL,
         data=payload,
         files={"file": (filename, file_bytes, "application/octet-stream")},
-        timeout=30,
+        # Contrainte de cadrage : latence de l'ordre de quelques secondes. 8s
+        # laisse une marge sur le temps de traitement observe d'OCR.space tout
+        # en bornant l'attente ; un depassement remonte OCR_TIMEOUT (504) avec
+        # une invitation a reessayer, pas un echec silencieux.
+        timeout=8,
     )
     response.raise_for_status()
 

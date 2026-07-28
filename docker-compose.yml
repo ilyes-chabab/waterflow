@@ -22,6 +22,10 @@ services:
       - mlflow
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      # Cle dediee ocr.space, definie dans un fichier .env local (gitignore, voir
+      # .env.example) ; retombe sur la cle de demo publique "helloworld" si absente
+      # (limitee a 25 000 req/mois, 1 page, 1 Mo - suffisant en developpement).
+      OCR_SPACE_API_KEY: ${OCR_SPACE_API_KEY:-helloworld}
     volumes:
       - ./data/db:/app/data/db
     ports:
